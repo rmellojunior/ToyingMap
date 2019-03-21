@@ -20,8 +20,17 @@
         android:layout_height="wrap_content"
         android:layout_width="wrap_content"
         android:layout_centerInParent="true"
-        android:id="@+id/imgLocationPinUp"
+        android:id="@+id/centerMarker"
         android:src="@mipmap/ic_user_location"
+        />
+
+    <ImageView
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:id="@+id/edgeMarker"
+        android:layout_centerInParent="true"
+        android:src="@mipmap/ic_user_location"
+        android:visibility="gone"
         />
 
 </RelativeLayout>
