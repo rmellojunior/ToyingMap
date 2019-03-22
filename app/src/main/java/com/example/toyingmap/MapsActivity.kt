@@ -1,5 +1,7 @@
 package com.example.toyingmap
 
+import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
 
@@ -26,9 +28,9 @@ class MapsActivity : AppCompatActivity() {
     private const val LAYOUT = R.layout.activity_maps
 
     //if other views will open this activity/fragment use this method
-//    fun getNavigationIntent(parentActivity: Activity): Intent {
-//      return Intent(parentActivity, MapsActivity::class.java)
-//    }
+    fun getNavigationIntent(parentActivity: Activity): Intent {
+      return Intent(parentActivity, MapsActivity::class.java)
+    }
   }
 
 }
