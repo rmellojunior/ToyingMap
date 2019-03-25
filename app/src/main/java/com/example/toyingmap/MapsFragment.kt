@@ -11,7 +11,6 @@ import android.view.View
 import android.view.ViewGroup
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
-import com.google.android.gms.maps.GoogleMap.OnMapLoadedCallback
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.CircleOptions
@@ -22,6 +21,7 @@ import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers
 import kotlinx.android.synthetic.main.fragment_maps.centerMarker
 import kotlinx.android.synthetic.main.fragment_maps.edgeMarker
+import kotlinx.android.synthetic.main.fragment_maps.line
 import java.lang.Math.asin
 import java.lang.Math.atan2
 import java.lang.Math.cos
@@ -156,6 +156,24 @@ class MapsFragment : Fragment(), MapsContract.View, OnMapReadyCallback {
       visibility = View.VISIBLE
     }
 
+    line.apply {
+      layoutParams.width = radiusPixels
+      val arr = intArrayOf(0, 0)
+      centerMarker.getLocationOnScreen(arr)
+      y = (arr[1]).toFloat()
+      x = (arr[0] + centerMarker.width / 2.0).toFloat()
+      requestLayout()
+      visibility = View.VISIBLE
+    }
+
+    //the dashed line it is not so good for me
+//    googleMap.addPolyline(
+//      PolylineOptions()
+//        .add(lastLocation, MapsUtils.getPoint(lastLocation, mapRadius.toInt(),0.0))
+//        .width(5f)
+//        .pattern(PATTERN_POLYGON_ALPHA)
+//        .color(Color.RED))
+
   }
 
   private fun animateCamera() {
@@ -271,6 +289,26 @@ class MapsFragment : Fragment(), MapsContract.View, OnMapReadyCallback {
 
         return EARTH_RADIUS * tt
       }
+
+      fun getPoint(center: LatLng, radius: Int, angle: Double): LatLng {
+        // Get the coordinates of a circle point at the given angle
+        val east = radius * Math.cos(angle)
+
+        val cLat = center.latitude
+        val cLng = center.longitude
+        val latRadius = EARTH_RADIUS * Math.cos(cLat / 180 * Math.PI)
+
+        val newLng = cLng + (east / latRadius / Math.PI * 180)
+
+        return LatLng(center.latitude, newLng)
+      }
+
+//      val PATTERN_DASH_LENGTH_PX = 20f
+//      val PATTERN_GAP_LENGTH_PX = 20f
+//      val DASH = Dash(PATTERN_DASH_LENGTH_PX)
+//      val GAP = Gap(PATTERN_GAP_LENGTH_PX)
+//      val PATTERN_POLYGON_ALPHA = listOf(GAP, DASH)
+
     }
   }
 }

@@ -31,4 +31,13 @@
         android:visibility="gone"
         />
 
+    <ImageView
+        android:id="@+id/line"
+        android:layout_width="match_parent"
+        android:layout_height="5dp"
+        android:layerType="software"
+        android:src="@drawable/dotted"
+        android:visibility="gone"
+        />
+
 </RelativeLayout>
