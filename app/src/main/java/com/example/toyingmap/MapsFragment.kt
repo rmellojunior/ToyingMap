@@ -11,27 +11,39 @@ import android.view.View
 import android.view.ViewGroup
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.GoogleMap.OnMapLoadedCallback
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.CircleOptions
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.jakewharton.rxbinding2.view.RxView
 import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers
 import kotlinx.android.synthetic.main.fragment_maps.centerMarker
 import kotlinx.android.synthetic.main.fragment_maps.edgeMarker
+import java.lang.Math.asin
+import java.lang.Math.atan2
+import java.lang.Math.cos
+import java.lang.Math.sin
+import java.lang.Math.toDegrees
+import java.lang.StrictMath.toRadians
 
 class MapsFragment : Fragment(), MapsContract.View, OnMapReadyCallback {
 
   private lateinit var lastLocation: LatLng //mocked -> Sydney
-  private lateinit var map: GoogleMap
+  private lateinit var googleMap: GoogleMap
 
-  private var radiusInMeters = 100.0  //mocked
+  /*****************
+   **     MAP     **
+   *****************/
+  private var mapRadius = 100.0
+  private var mapZoom = 17.8f
 
   // save in resources
-  private val myStrokeColor = -0x10000 //red outline
-  private val myShadeColor = 0x44ff0000 //opaque red fill
-  private val myStrokeWidth = 8f
+  private val mapStrokeColor = -0x10000 //red outline
+  private val mapShadeColor = 0x44ff0000 //opaque red fill
+  private val mapStrokeWidth = 8f
 
   private lateinit var onCameraIdleListener: GoogleMap.OnCameraIdleListener
   private lateinit var onCameraMoveStartedListener: GoogleMap.OnCameraMoveStartedListener
@@ -61,43 +73,9 @@ class MapsFragment : Fragment(), MapsContract.View, OnMapReadyCallback {
     )
   }
 
-  override fun markerTouch(): Observable<MotionEvent> {
-    return RxView.touches(edgeMarker)
-      .map { motionEvent -> motionEvent }
-  }
-
-  private fun configureListeners() {
-    configureCameraIdleListener()
-    configureCameraStartedListener()
-  }
-
-  override fun updateCircle(event: MotionEvent) {
-    val lastLocationPoint = map.projection.toScreenLocation(lastLocation)
-    if (event.rawX > lastLocationPoint.x) {
-      val currentPosition = map.projection.fromScreenLocation(
-        Point(event.rawX.toInt(), edgeMarker.y.toInt()))
-      radiusInMeters = MapsUtils.meterDistanceBetweenPoints(lastLocation.latitude,
-        lastLocation.longitude,
-        currentPosition.latitude, currentPosition.longitude)
-      map.clear()
-      drawCircle(lastLocation)
-    }
-  }
-
-  private fun configureCameraStartedListener() {
-    onCameraMoveStartedListener = GoogleMap.OnCameraMoveStartedListener { map.clear() }
-  }
-
-  private fun configureCameraIdleListener() {
-    onCameraIdleListener = GoogleMap.OnCameraIdleListener {
-      lastLocation = map.cameraPosition.target
-      drawCircle(lastLocation)
-    }
-  }
-
   /**
-   * Manipulates the map once available.
-   * This callback is triggered when the map is ready to be used.
+   * Manipulates the googleMap once available.
+   * This callback is triggered when the googleMap is ready to be used.
    * This is where we can add markers or lines, add listeners or move the camera. In this case,
    * we just add a marker near Sydney, Australia.
    * If Google Play services is not installed on the device, the user will be prompted to install
@@ -105,7 +83,7 @@ class MapsFragment : Fragment(), MapsContract.View, OnMapReadyCallback {
    * installed Google Play services and returned to the app.
    */
   override fun onMapReady(googleMap: GoogleMap) {
-    map = googleMap
+    this.googleMap = googleMap
 
     // Add a marker in Sydney
     lastLocation = LatLng(30.0, 151.0)
@@ -123,36 +101,89 @@ class MapsFragment : Fragment(), MapsContract.View, OnMapReadyCallback {
       return
     }
 
-    // Got last known location. In some rare situations this can be null.
     if (lastLocation != null) {
-      map.animateCamera(CameraUpdateFactory.newLatLngZoom(lastLocation, 17f))
+      googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(lastLocation, mapZoom))
 
       drawCircle(lastLocation)
 
-      map.setOnCameraMoveStartedListener(onCameraMoveStartedListener)
-      map.setOnCameraIdleListener(onCameraIdleListener)
+      googleMap.setOnCameraMoveStartedListener(onCameraMoveStartedListener)
+      googleMap.setOnCameraIdleListener(onCameraIdleListener)
     }
+  }
+
+  override fun markerTouch(): Observable<MotionEvent> {
+    return RxView.touches(edgeMarker)
+      .map { motionEvent -> motionEvent }
+  }
+
+  override fun updateCircle(event: MotionEvent) {
+    val lastLocationPoint = googleMap.projection.toScreenLocation(lastLocation)
+    if (event.rawX > lastLocationPoint.x) {
+      val currentPosition = googleMap.projection.fromScreenLocation(
+        Point(event.rawX.toInt(), edgeMarker.y.toInt()))
+      mapRadius = MapsUtils.meterDistanceBetweenPoints(lastLocation.latitude,
+        lastLocation.longitude,
+        currentPosition.latitude, currentPosition.longitude)
+      mapClear()
+      drawCircle(lastLocation)
+    }
+  }
+
+  override fun updateZoom(event: MotionEvent) {
+    mapClear()
+    drawCircle(lastLocation)
+    animateCamera()
   }
 
   private fun drawCircle(position: LatLng) {
 
-    map.addCircle(
+    googleMap.addCircle(
       CircleOptions().apply {
         center(position)
-        radius(radiusInMeters)
-        fillColor(myShadeColor)
-        strokeColor(myStrokeColor)
-        strokeWidth(myStrokeWidth)
+        radius(mapRadius)
+        fillColor(mapShadeColor)
+        strokeColor(mapStrokeColor)
+        strokeWidth(mapStrokeWidth)
       }
     )
 
-    val radiusPixels = MapsUtils.convertZoneRadiusToPixels(map, lastLocation.latitude,
-      lastLocation.longitude, radiusInMeters)
+    val radiusPixels = MapsUtils.convertZoneRadiusToPixels(googleMap, lastLocation.latitude,
+      lastLocation.longitude, mapRadius)
 
-    edgeMarker.x = centerMarker.x + radiusPixels
-    edgeMarker.y = centerMarker.y
-    edgeMarker.visibility = View.VISIBLE
+    edgeMarker.apply {
+      x = centerMarker.x + radiusPixels
+      y = centerMarker.y
+      visibility = View.VISIBLE
+    }
 
+  }
+
+  private fun animateCamera() {
+    val targetNorthEast = MapsUtils.computeOffset(lastLocation, mapRadius * Math.sqrt(2.0), 45.0)
+    val targetSouthWest = MapsUtils.computeOffset(lastLocation, mapRadius * Math.sqrt(2.0), 225.0)
+    val padding = MapsUtils.calculatePadding(view!!.width)
+    googleMap.animateCamera(CameraUpdateFactory.newLatLngBounds(
+      LatLngBounds.builder().include(targetNorthEast).include(targetSouthWest).build(), padding))
+  }
+
+  private fun configureListeners() {
+    configureCameraIdleListener()
+    configureCameraStartedListener()
+  }
+
+  private fun configureCameraStartedListener() {
+    onCameraMoveStartedListener = GoogleMap.OnCameraMoveStartedListener { mapClear() }
+  }
+
+  private fun configureCameraIdleListener() {
+    onCameraIdleListener = GoogleMap.OnCameraIdleListener {
+      lastLocation = googleMap.cameraPosition.target
+      drawCircle(lastLocation)
+    }
+  }
+
+  private fun mapClear() {
+    googleMap.clear()
   }
 
   companion object {
@@ -166,8 +197,16 @@ class MapsFragment : Fragment(), MapsContract.View, OnMapReadyCallback {
     }
   }
 
+  /**
+   * This class is a simple version of Android-maps-utils open-source library. MapsUtils contains
+   * Google Maps Android API utilities that are useful to our application.
+   */
   private class MapsUtils {
     companion object {
+
+      /**
+       *
+       */
       fun convertZoneRadiusToPixels(map: GoogleMap, lat: Double, lng: Double,
         radiusInMeters: Double): Int {
         val lat1 = radiusInMeters / EARTH_RADIUS
@@ -180,6 +219,40 @@ class MapsFragment : Fragment(), MapsContract.View, OnMapReadyCallback {
         val p2 = map.projection.toScreenLocation(LatLng(lat2, lng2))
 
         return Math.abs(p1.x - p2.x)
+      }
+
+      /** Calculate padding offset from edges of the map - 10% of screen */
+      fun calculatePadding(mapWidth: Int): Int {
+        return (mapWidth * 0.10).toInt()
+      }
+
+      /**
+       * This example belongs to android-maps-utils SphericalUtil class
+       * Returns the LatLng resulting from moving a distance from an origin
+       * in the specified heading (expressed in degrees clockwise from north).
+       * @see [stackoverflow](https://stackoverflow.com/questions/15319431/how-to-convert-a-latlng-and-a-radius-to-a-latlngbounds-in-android-google-maps-ap/31029389#31029389)
+       * @see [SphericalUtil](https://github.com/googlemaps/android-maps-utils/blob/master/library/src/com/google/maps/android/SphericalUtil.java)
+       * @param from     The LatLng from which to start.
+       * @param distance The distance to travel.
+       * @param heading  The heading in degrees clockwise from north.
+       */
+      fun computeOffset(from: LatLng, distance: Double, heading: Double): LatLng {
+        var distance = distance
+        var heading = heading
+        distance /= EARTH_RADIUS
+        heading = toRadians(heading)
+        // http://williams.best.vwh.net/avform.htm#LL
+        val fromLat = toRadians(from.latitude)
+        val fromLng = toRadians(from.longitude)
+        val cosDistance = cos(distance)
+        val sinDistance = sin(distance)
+        val sinFromLat = sin(fromLat)
+        val cosFromLat = cos(fromLat)
+        val sinLat = cosDistance * sinFromLat + sinDistance * cosFromLat * cos(heading)
+        val dLng = atan2(
+          sinDistance * cosFromLat * sin(heading),
+          cosDistance - sinFromLat * sinLat)
+        return LatLng(toDegrees(asin(sinLat)), toDegrees(fromLng + dLng))
       }
 
       fun meterDistanceBetweenPoints(latA: Double, lngA: Double, latB: Double,

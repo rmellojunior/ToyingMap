@@ -11,6 +11,8 @@ interface MapsContract {
 
     fun updateCircle(event: MotionEvent)
 
+    fun updateZoom(event: MotionEvent)
+
   }
 
   interface Presenter {

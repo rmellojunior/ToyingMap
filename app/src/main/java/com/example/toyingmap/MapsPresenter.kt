@@ -33,6 +33,11 @@ class MapsPresenter(
         view.updateCircle(event)
         true
       }
+      MotionEvent.ACTION_UP -> {
+//        view.updateCircle(event)
+        view.updateZoom(event)
+        true
+      }
       else -> {
         true
       }
